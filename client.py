@@ -1,6 +1,7 @@
 import socket
 import pickle
 
+#client settings
 HEADER = 64
 PORT = 12000
 FORMAT = 'utf-8'
@@ -11,23 +12,42 @@ ADDR = (SERVER, PORT)
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect(ADDR) 
 
+currentUserID = ""
+currentUserCreds = ""
 
+#event list
+events = ["Phantom of the Opera","Les Miserables","Aladdin","Beauty and the Beast"]
 
-def send(msg):
+def calcCost(numChildTickets, numAdultTickets):
+    return int(numChildTickets*20 + numAdultTickets*50) 
+
+def send(msg): #whatever is passed to this method will be sent to the server like a request
     message = msg.encode(FORMAT)
     msg_length = len(message)
     send_length = str(msg_length).encode(FORMAT)
     send_length += b' ' * (HEADER - len(send_length))
     client.send(send_length)
     client.send(message)
-    
-    
-    
+
+def printmenu(): #simple method to print menu options
+    print("------------")
+    print("Menu options")
+    print("------------")
+    print("1 - View tickets for upcoming events")
+    print("2 - Add tickets to cart")
+    print("3 - Remove tickets from cart")
+    print("4 - Check out")
+    print("5 - View order history")
+    print("6 - View balance")
+    print("7 - Add points to account")
+    print("8 - Log out")   
+
+#main menu method to handle clients choices and requests      
 def menu():
 
     loop1 = True
     while loop1:
-
+        #First loop is for the login menu where users will be able to register, login, or exit
         print("Hello, if you are a new user enter 1 to log in.\nIf you have an account, enter 2 to log in.")
         print("1 - Register")
         print("2 - Log in")
@@ -35,61 +55,103 @@ def menu():
 
         l_or_r = input()
 
-        if l_or_r == "1":
-            print("Okay")
+        if l_or_r == "1": #ask for user credentials and send to server so that the server can add them to the user list
+            send("register")
+            username = input("Enter the username you wish to use: ")
+            
+            password = input("Enter a password: ")
 
-        elif l_or_r == "2":
+            credentials = username + " " + password
+
+            send(credentials)
+            
+
+
+        elif l_or_r == "2":#authenticate user and allow them to see the full option menu
+            send("login")
+            
+            login_loop = True
+            while login_loop:
+
+                login_attempt_name = input("Please enter your username: ")
+                login_attempt_passwd = input("Please enter your password: ")
+                login_attempt = login_attempt_name + " " + login_attempt_passwd
+
+                send(login_attempt)
+                server_msg = client.recv(2048).decode(FORMAT)
+                
+                if server_msg == "Successfully logged in":
+                    print("---------------------------------------")
+                    print("Client message - Successfully logged in")
+                    print("---------------------------------------")
+                    login_loop = False
+                    currentUserCreds = login_attempt
+                else:
+                    print("Username/password combination not found. Please try again.")
+
             loop2 = True
             while(loop2): 
-                print("Menu options")
-                print("------------")
-                print("1 - View tickets for upcoming events")
-                print("2 - Add tickets to cart")
-                print("3 - Remove tickets from cart")
-                print("4 - Check out")
-                print("5 - View order history")
-                print("6 - View balance")
-                print("7 - Add points to account")
-                print("8 - Log out")
+                
+                
+                printmenu()
 
                 x = input("Please select an option...")
                 match x:
+                    
+                    #Case to display events
                     case "1":
+                        print("--------------------------")
                         print("Displaying upcoming events")
-                        send("1")
-                        print(pickle.loads(client.recv(2048)))
+                        print("--------------------------")
+                        print(events)
                         print("Tickets for adults are 50p, tickets for children are 20p")
-                        
+
+                    #Case to handle adding tickets to cart
                     case "2":
-                        send("2")
-                        a = input("Enter the event name you wish to buy tickets for: ")
-                        send(a)
-                        print(client.recv(2048).decode(FORMAT))
-                        #b = input("Please enter the number of adult tickets you want: ")
+                        send("2") #sends "2" to server so that it can execute case 2
+                        answer = input("Enter the event name you wish to buy tickets for: ")             
 
-                        #c = input("Please enter the number of child tickets you want: ")
-                        
+                        if answer in events:
+                            b = int(input("Enter the amount of adult tickets you'd like to add to your cart: "))
+                            c = int(input("Enter the amount of child tickets you'd like to add to your cart: "))
+                            d = b*50
+                            e = c*20
+                            cost = d + e 
+                            print("Tickets with a value of: ", cost, " have been added to your cart")        
+                        else:
+                            print("Event not in catalogue")    
 
-                        print("Tickets added.")
-                    case "3": 
+                    case "3": #remove tickets
                         c = input("Enter the event name you wish to remove tickets for")
-                    case "4":
-                        print("Purchasing tickets...")                
-                    case "5":
-                        print("Displaying order history...")                
-                    case "6":
-                        print("Your balance is: ")    
-                        send("6")
 
-                    case "7":
-                        d = input("Enter the amount of points you wish to add: ")
+                    case "4": #check out
+                        print("Purchasing tickets...")   
+
+                    case "5": #show order history
+                        print("Displaying order history...") 
+
+                    case "6": #show balance
+                        send("6")
+                        send(currentUserCreds)
+                        print("Your balance is: ")    
+                        print(client.recv(2048).decode(FORMAT))
+                        
+                    case "7": #add points to user's balance
+                        send("7")
+                        send(currentUserCreds)
+                        amount = input("Enter the amount of points you wish to add: ")                        
+                        send(amount)
                         print("Adding points...")
-                    case "8":
+                        print(client.recv(2048).decode(FORMAT))
+
+                    case "8": #quit to login menu
                         print("Logging out")
                         loop2 = False
-        elif l_or_r == "3":
-            print("Exiting...")
+
+        elif l_or_r == "3": #exit whole program
+            print("Exiting...")            
             loop1 = False
+
         else:
             print("Please enter 1, 2 or 3")    
 
